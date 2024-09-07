@@ -15,9 +15,8 @@
  */
 package scriptella.jdbc;
 
-import scriptella.util.IOUtils;
-
 import java.io.Closeable;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.net.URL;
@@ -26,6 +25,7 @@ import java.sql.Clob;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
@@ -33,6 +33,8 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+
+import scriptella.util.IOUtils;
 
 /**
  * Represents a converter for prepared statement parameters and result set columns.
@@ -150,7 +152,15 @@ class JdbcTypesConverter implements Closeable {
 
     protected void setClob(final PreparedStatement ps, final int index, final Clob clob) throws SQLException {
         Reader reader = clob.getCharacterStream();
-        ps.setCharacterStream(index, reader, (int) clob.length());
+        try {
+            ps.setCharacterStream(index, reader, (int) clob.length());
+        } catch (SQLFeatureNotSupportedException e) {
+            try {
+                ps.setObject(index, IOUtils.toString(clob.getCharacterStream()), Types.LONGVARCHAR);
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
         registerResource(reader);
     }
 
